@@ -1,0 +1,41 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Test Python Imports
+        run: |
+          python -c "import pandas"
+          python -c "import numpy"
+          python -c "import sklearn"
+          python -c "import joblib"
+          python -c "import streamlit"
+
+      - name: Test Project Modules
+        run: |
+          python -c "from src.data_preprocessing import load_data, preprocess_data"
+          python -c "from src.model_training import train_model, save_model"
+          python -c "from src.predict import load_model, make_prediction"
