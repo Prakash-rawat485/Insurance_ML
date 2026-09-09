@@ -1,0 +1,38 @@
+name: CT Pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "data/**"
+
+jobs:
+
+  train:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Train Model
+        run: |
+          python -m src.model_training
+
+      - name: Upload Trained Model
+        uses: actions/upload-artifact@v4
+        with:
+          name: insurance-model
+          path: models/insurance_model.pkl
