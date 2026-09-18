@@ -1,13 +1,20 @@
 import os
 import joblib
 import pandas as pd
+import mlflow
+import mlflow.sklearn
 
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.pipeline import Pipeline
 
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.linear_model import (
+    LinearRegression,
+    Ridge,
+    Lasso,
+    ElasticNet
+)
 
 from sklearn.metrics import (
     mean_absolute_error,
@@ -20,7 +27,11 @@ from sklearn.metrics import (
 # 1. PATHS
 # =========================================================
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
+)
 
 DATA_PATH = os.path.join(
     BASE_DIR,
@@ -38,13 +49,30 @@ MODEL_PATH = os.path.join(
     "insurance_model.pkl"
 )
 
+MLFLOW_DB = os.path.join(
+    BASE_DIR,
+    "mlflow.db"
+)
 
-# Create models folder if it doesn't exist
+
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 
 # =========================================================
-# 2. LOAD DATA
+# 2. MLflow CONFIGURATION
+# =========================================================
+
+mlflow.set_tracking_uri(
+    f"sqlite:///{MLFLOW_DB}"
+)
+
+mlflow.set_experiment(
+    "Insurance_Charges_Prediction"
+)
+
+
+# =========================================================
+# 3. LOAD DATA
 # =========================================================
 
 df = pd.read_csv(DATA_PATH)
@@ -54,25 +82,31 @@ print("Shape:", df.shape)
 
 
 # =========================================================
-# 3. REMOVE DUPLICATES
+# 4. REMOVE DUPLICATES
 # =========================================================
 
 df = df.drop_duplicates()
 
-print("Shape after removing duplicates:", df.shape)
+print(
+    "Shape after removing duplicates:",
+    df.shape
+)
 
 
 # =========================================================
-# 4. FEATURES AND TARGET
+# 5. FEATURES AND TARGET
 # =========================================================
 
-X = df.drop("charges", axis=1)
+X = df.drop(
+    "charges",
+    axis=1
+)
 
 y = df["charges"]
 
 
 # =========================================================
-# 5. IDENTIFY CATEGORICAL AND NUMERICAL FEATURES
+# 6. FEATURES
 # =========================================================
 
 categorical_features = [
@@ -89,11 +123,12 @@ numerical_features = [
 
 
 # =========================================================
-# 6. PREPROCESSING
+# 7. PREPROCESSING
 # =========================================================
 
 preprocessor = ColumnTransformer(
     transformers=[
+
         (
             "categorical",
             OneHotEncoder(
@@ -113,7 +148,7 @@ preprocessor = ColumnTransformer(
 
 
 # =========================================================
-# 7. TRAIN / TEST SPLIT
+# 8. TRAIN / TEST SPLIT
 # =========================================================
 
 X_train, X_test, y_train, y_test = train_test_split(
@@ -125,84 +160,176 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 
 # =========================================================
-# 8. MODELS
+# 9. MODELS
 # =========================================================
 
 models = {
 
-    "Linear Regression": LinearRegression(),
+    "Linear Regression":
+        LinearRegression(),
 
-    "Ridge": Ridge(alpha=1.0),
+    "Ridge":
+        Ridge(alpha=1.0),
 
-    "Lasso": Lasso(alpha=0.1),
+    "Lasso":
+        Lasso(alpha=0.1),
 
-    "Elastic Net": ElasticNet(
-        alpha=0.1,
-        l1_ratio=0.5
-    )
+    "Elastic Net":
+        ElasticNet(
+            alpha=0.1,
+            l1_ratio=0.5
+        )
 }
 
 
 # =========================================================
-# 9. TRAIN AND COMPARE MODELS
+# 10. TRAIN MODELS + MLflow
 # =========================================================
 
 results = []
 
 trained_models = {}
 
+
 for name, model in models.items():
+
+    print(f"\nTraining {name}...")
 
     pipeline = Pipeline(
         steps=[
-            ("preprocessor", preprocessor),
-            ("model", model)
+            (
+                "preprocessor",
+                preprocessor
+            ),
+            (
+                "model",
+                model
+            )
         ]
     )
 
-    pipeline.fit(X_train, y_train)
 
-    predictions = pipeline.predict(X_test)
+    # Start MLflow run
+    with mlflow.start_run(
+        run_name=name
+    ):
 
-    mae = mean_absolute_error(
-        y_test,
-        predictions
-    )
+        # Train
+        pipeline.fit(
+            X_train,
+            y_train
+        )
 
-    mse = mean_squared_error(
-        y_test,
-        predictions
-    )
 
-    rmse = mse ** 0.5
+        # Predict
+        predictions = pipeline.predict(
+            X_test
+        )
 
-    r2 = r2_score(
-        y_test,
-        predictions
-    )
 
-    results.append({
-        "Model": name,
-        "MAE": mae,
-        "RMSE": rmse,
-        "R2": r2
-    })
+        # Metrics
+        mae = mean_absolute_error(
+            y_test,
+            predictions
+        )
 
-    trained_models[name] = pipeline
+        mse = mean_squared_error(
+            y_test,
+            predictions
+        )
+
+        rmse = mse ** 0.5
+
+        r2 = r2_score(
+            y_test,
+            predictions
+        )
+
+
+        # -------------------------------------------------
+        # Log model parameters
+        # -------------------------------------------------
+
+        mlflow.log_param(
+            "model",
+            name
+        )
+
+        mlflow.log_param(
+            "test_size",
+            0.20
+        )
+
+        mlflow.log_param(
+            "random_state",
+            42
+        )
+
+
+        # -------------------------------------------------
+        # Log metrics
+        # -------------------------------------------------
+
+        mlflow.log_metric(
+            "MAE",
+            mae
+        )
+
+        mlflow.log_metric(
+            "RMSE",
+            rmse
+        )
+
+        mlflow.log_metric(
+            "R2",
+            r2
+        )
+
+
+        # -------------------------------------------------
+        # Log model
+        # -------------------------------------------------
+
+        mlflow.sklearn.log_model(
+            pipeline,
+            name="model",
+            registered_model_name="Insurance_Charges_Model"
+)
+
+
+        # Store results
+        results.append({
+            "Model": name,
+            "MAE": mae,
+            "RMSE": rmse,
+            "R2": r2
+        })
+
+        trained_models[name] = pipeline
+
+
+        print(
+            f"{name} → "
+            f"MAE={mae:.2f}, "
+            f"RMSE={rmse:.2f}, "
+            f"R2={r2:.4f}"
+        )
 
 
 # =========================================================
-# 10. MODEL COMPARISON
+# 11. MODEL COMPARISON
 # =========================================================
 
-results_df = pd.DataFrame(results)
+results_df = pd.DataFrame(
+    results
+)
 
 print("\nModel Comparison:")
 print(results_df)
 
 
 # =========================================================
-# 11. SELECT BEST MODEL
+# 12. SELECT BEST MODEL
 # =========================================================
 
 best_model_name = results_df.loc[
@@ -210,13 +337,19 @@ best_model_name = results_df.loc[
     "Model"
 ]
 
-best_model = trained_models[best_model_name]
+best_model = trained_models[
+    best_model_name
+]
 
-print("\nSelected Model:", best_model_name)
+
+print(
+    "\nSelected Model:",
+    best_model_name
+)
 
 
 # =========================================================
-# 12. SAVE MODEL
+# 13. SAVE BEST MODEL
 # =========================================================
 
 joblib.dump(
@@ -224,5 +357,9 @@ joblib.dump(
     MODEL_PATH
 )
 
-print("\nModel saved successfully:")
+
+print(
+    "\nBest model saved successfully:"
+)
+
 print(MODEL_PATH)
