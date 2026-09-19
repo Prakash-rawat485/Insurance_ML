@@ -1,0 +1,23 @@
+artifact_path: file:D:/MY Projects (github)/Insurance_ML/mlruns/1/models/m-e6f97b7c71e24c5e8b19182b8d440893/artifacts
+flavors:
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.sklearn
+    model_path: model.skops
+    predict_fn: predict
+    python_version: 3.12.13
+  sklearn:
+    code: null
+    pickled_model: model.skops
+    serialization_format: skops
+    sklearn_version: 1.9.1
+    skops_trusted_types: null
+mlflow_version: 3.16.1
+model_id: m-e6f97b7c71e24c5e8b19182b8d440893
+model_size_bytes: 99026
+model_uuid: m-e6f97b7c71e24c5e8b19182b8d440893
+prompts: null
+run_id: e038c30c5f1a4c4f8eb55e5b32790fb6
+utc_time_created: '2026-09-18 07:41:46.736635'
